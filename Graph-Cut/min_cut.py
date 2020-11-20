@@ -1,5 +1,6 @@
 import numpy as np 
 from PIL import Image
+import time
 
 def addEdge(G, u, v, w):
     if u not in G:
@@ -71,6 +72,7 @@ def minCut(G, src, dst):
 
 
 def patchFitting(im_src, im_dst):
+    st = time.time()
     G = {}
     im_diff = (im_src - im_dst) ** 2
     im_diff = np.sum(im_diff, axis = 2)
@@ -101,7 +103,8 @@ def patchFitting(im_src, im_dst):
     im_out = im_src.copy()
 
     min_cut = minCut(G, 0, f)
-    print(min_cut)
+    print(time.time() - st)
+    # print(min_cut)
     for i, j in min_cut:
         del G[i][j]
         del G[j][i]
@@ -112,13 +115,14 @@ def patchFitting(im_src, im_dst):
     # print(set(left) & set(right))
     print('done tarjan')
 
-    for i in range(height):
-        for j in range(width):
-            s = i * width + j + 1
-            if s in right:
-                im_out[i, j] = im_dst[i, j]
+    return right
+    # for i in range(height):
+    #     for j in range(width):
+    #         s = i * width + j + 1
+    #         if s in right:
+    #             im_out[i, j] = im_dst[i, j]
 
-    return im_out
+    # return im_out
 
 def tarjan(G, s):
     # ret = set()
@@ -133,34 +137,20 @@ def tarjan(G, s):
     ret = [i for i in range(s+1) if vis[i] == 1]
     return set(ret)
 
-im = Image.open('./akeyboard_small.jpg')
-im.show()
-im = im.convert('RGB')
-im = np.array(im, dtype=np.uint8)
-# print(im)
-print(im.shape)
 
 
+# im_out = patchFitting(im_src, im_dst)
 
-overlap = 24
+# h, w, _ = im.shape
+# new_im = np.zeros([h, 2 * w - overlap, 3])
+# print(new_im.shape)
+# new_im[:, :im.shape[1]] = im
+# new_im[:, im.shape[1]-overlap:] = im 
 
-im_src = im[:, -overlap:]
-print(im_src.shape)
-im_dst = im[:, :overlap]
-print(im_dst.shape)
-
-im_out = patchFitting(im_src, im_dst)
-
-h, w, _ = im.shape
-new_im = np.zeros([h, 2 * w - overlap, 3])
-print(new_im.shape)
-new_im[:, :im.shape[1]] = im
-new_im[:, im.shape[1]-overlap:] = im 
-
-show_im = Image.fromarray(new_im.astype(np.uint8))
-show_im.show()
+# show_im = Image.fromarray(new_im.astype(np.uint8))
+# show_im.show()
 
 
-new_im[:, im.shape[1]-overlap:im.shape[1]] = im_out
-show_im = Image.fromarray(new_im.astype(np.uint8))
-show_im.show()
+# new_im[:, im.shape[1]-overlap:im.shape[1]] = im_out
+# show_im = Image.fromarray(new_im.astype(np.uint8))
+# show_im.show()
