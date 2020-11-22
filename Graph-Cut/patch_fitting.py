@@ -15,7 +15,7 @@ def build_boarder(height, width, dir):
     else:
         return [(i, 0) for i in range(height)]
 
-def build_graph(im_src, im_dst, force_src, force_dst):
+def build_graph(im_src, im_dst, force_src, force_dst, overlap_map):
     im_diff = (im_src - im_dst) ** 2
     im_diff = np.sum(im_diff, axis = 2)
 
@@ -27,49 +27,54 @@ def build_graph(im_src, im_dst, force_src, force_dst):
     ret_edges = []
     for i in range(height):
         for j in range(width):
+            if overlap_map[i, j] == 0: continue
             u = i * width + j + 1 
             neibors = [(i-1, j), (i+1, j), (i, j-1), (i, j+1)]
             for x, y in neibors:
-                if 0 <= x and x < height and 0 <= y and y < width:
+                if 0 <= x and x < height and 0 <= y and y < width and overlap_map[x, y] == 1:
                     
                     v = x * width + y + 1
                     M = im_diff[i, j] + im_diff[x, y]
                     ret_edges.append((u, v, M))
-    
-    for di in force_src:
-        nodes = build_boarder(height, width, di)
-        for i, j in nodes:
-            ret_edges.append((s, i * width + j + 1, float("inf")))
-    
-    for di in force_dst:
-        nodes = build_boarder(height, width, di)
-        for i, j in nodes:
-            ret_edges.append((f, i * width + j + 1, float("inf")))
-    
+            if force_src[i, j] == 1 and force_dst[i, j] == 0:
+                ret_edges.append((s, u, float("inf")))
+            if force_src[i, j] == 0 and force_dst[i, j] == 1:
+                ret_edges.append((f, u, float("inf")))
+     
     return s, f, ret_edges
 
 
-def patch_fitting(im_src, im_dst, force_src, force_dst):
-    s, f, edges = build_graph(im_src, im_dst, force_src, force_dst)
+def patch_fitting(im_src, im_dst, force_src, force_dst, overlap_map):
+    s, f, edges = build_graph(im_src, im_dst, force_src, force_dst, overlap_map)
     G = nx.Graph()
     G.add_weighted_edges_from(edges)
 
-    _, partion = nx.minimum_cut(G, s, f, 'weight')
-    _, right = partion
-
     height, width = im_src[:, :, 0].shape
-    im_out = im_src.copy()
-    for idx in right:
-        if idx == f: continue
-        x, y = (idx - 1) // width, (idx - 1) % width
-        # print(x, y)
-        im_out[x, y] = im_dst[x, y]
-    return im_out
+    if G.has_node(s) and G.has_node(f):
+        _, partion = nx.minimum_cut(G, s, f, 'weight')
+        left, right = partion
+        print('done')
+        im_tmp = im_dst.copy()
+        for idx in left:
+            if idx == s: continue
+            x, y = (idx - 1) // width, (idx - 1) % width
+            print(x, y)
+            im_tmp[x, y] = im_src[x, y]
+        
+        im_src[:, :, :] = im_tmp[:, :, :]
+        
+    else: 
+        im_src[:, :, :] = im_dst[:, :, :]
+    
+    # im_out = im_src.copy()
+    # im_src[:, :, :] = im_dst[:, :, :]
+    
+    
 
 
 def prepare_patch_fitting(im, im_input, im_mask, offset):
     # height, width, _ = im.shape
-    h, w = im_input.shape
+    h, w, _ = im_input.shape
 
     # im_mask = (im != 0)
     im_mask_input = np.zeros(im_mask.shape)
@@ -81,21 +86,30 @@ def prepare_patch_fitting(im, im_input, im_mask, offset):
 
     force_src_map = get_force_map(im_mask, overlap_map)
     force_dst_map = get_force_map(im_mask_input, overlap_map)
-    print('*' * 50)
-    show(force_src_map)
-    print()
-    show(force_dst_map)
+    # print('*' * 50)
+    # show(force_src_map)
+    # print()
+    # show(force_dst_map)
+
+    print('im_mask')
+
+    show(im_mask)
+    print('overlap')
+    show(overlap_map)
+    print('im_mask_input')
+    show(im_mask_input)
 
     force_src_map = force_src_map[offset[0]:offset[0] + h, offset[1]:offset[1] + w]
     force_dst_map = force_dst_map[offset[0]:offset[0] + h, offset[1]:offset[1] + w]
     overlap_map = overlap_map[offset[0]:offset[0] + h, offset[1]:offset[1] + w]
 
+    overlap_map = overlap_map.astype(np.uint8)
     print('*' * 50)
     show(force_src_map)
     print()
     show(force_dst_map)
 
-    im_src = im[offset[0]:offset[0] + h, offset[1]:offset[1] + w] * overlap_map
+    im_src = im[offset[0]:offset[0] + h, offset[1]:offset[1] + w]
     im_dst = im_input
 
     return im_src, im_dst, force_src_map, force_dst_map, overlap_map
@@ -117,51 +131,42 @@ def get_force_map(mask, overlap):
 
 if __name__ == '__main__':
     
-    im = Image.open('./akeyboard_small.jpg')
+    im = Image.open('data/strawberries2.jpg')
     # im.show()
     im = im.convert('RGB')
-    im = np.array(im, dtype=np.uint8)
+    im_input = np.array(im, dtype=np.uint8)
     # print(im)
-    print(im.shape)
-    h, w, _ = im.shape
+    # im_input = im_input[:, :]
+    h, w, _ = im_input.shape
+    overlap = 40
 
-    # overlap = 70
-    # output_im = np.zeros([2 * h - overlap, w, _])
-    # output_im[0:h, :] = im 
-    # output_im[h-overlap:] = im 
+    im = np.zeros([2 * h - 20, 2 * w - overlap, _])
+    im_mask = np.zeros([2 * h - 20, 2 * w - overlap])
+    offset = [0, 0]
 
-    # im_src = im[-overlap:, :]
-    # im_dst = im[:overlap, :]
-    # output_im[h-overlap:h, :] = patch_fitting(im_src, im_dst, [0], [2])
 
-    # show_im = Image.fromarray(output_im.astype(np.uint8))
-    # show_im.show()
-
-    # overlap = 20
-    # output_im = np.zeros([h, 2 * w - overlap, _])
-    # output_im[:, :w] = im 
-    # output_im[:, w-overlap:] = im 
-
-    # im_src = im[:, -overlap:]
-    # im_dst = im[:, :overlap]
-    # output_im[:, w-overlap:w] = patch_fitting(im_src, im_dst, [3], [1])
-
-    # show_im = Image.fromarray(output_im.astype(np.uint8))
-    # show_im.show()
-
-    im = np.zeros([20, 20])
-    im[:12, :12] = 2
-    im_mask = (im != 0)
-    im = im.astype(np.uint8)
-    im_mask = im_mask.astype(np.uint8)
     
-    print(im)
-    print(im_mask)
 
-    im_input = np.ones([12, 10]) * 3
-    # im_input[:, :] = 3
-    offset = [0, 4]
+    im_src, im_dst, force_src_map, force_dst_map, overlap_map = prepare_patch_fitting(im, im_input, im_mask, offset)
+    patch_fitting(im_src, im_dst, force_src_map, force_dst_map, overlap_map)
 
-    prepare_patch_fitting(im, im_input, im_mask, offset)
-    # print(prepare_patch_fitting(im, im_input, im_mask, offset))
-    # print(np.where(im_mask > 0))
+    im_mask[:h, :w] = 1
+    offset = [0, w-overlap]
+
+    im_src, im_dst, force_src_map, force_dst_map, overlap_map = prepare_patch_fitting(im, im_input, im_mask, offset)
+    patch_fitting(im_src, im_dst, force_src_map, force_dst_map, overlap_map)
+
+    im_mask[:h, :] = 1
+    offset = [h-20, 0]
+
+    im_src, im_dst, force_src_map, force_dst_map, overlap_map = prepare_patch_fitting(im, im_input, im_mask, offset)
+    patch_fitting(im_src, im_dst, force_src_map, force_dst_map, overlap_map)
+
+    im_mask[:, :w] = 1
+    offset = [h-20, w-overlap]
+
+    im_src, im_dst, force_src_map, force_dst_map, overlap_map = prepare_patch_fitting(im, im_input, im_mask, offset)
+    patch_fitting(im_src, im_dst, force_src_map, force_dst_map, overlap_map)
+
+    show_im = Image.fromarray(im.astype(np.uint8))
+    show_im.show()
