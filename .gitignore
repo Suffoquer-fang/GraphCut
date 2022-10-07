@@ -131,6 +131,5 @@ dmypy.json
 report/
 
 *.zip
-*.jpg
 src/
 

@@ -46,15 +46,15 @@ Image.fromarray(im_src.astype(np.uint8)).show()
 
 ### Different Offset Matching
 Input texture --- Random Matching / Entire Matching / Subpatch Matching
-![](https://suffoquer-fang/GraphCut/figs/offset-matching.jpeg)
+![offset-matching](https://github.com/Suffoquer-fang/GraphCut/blob/main/figs/offset-matching.jpeg)
 
 ### Old Seam
 w/o old seam vs w/ old seam
-![](https://suffoquer-fang/GraphCut/figs/old-seam.jpg)
+![old-seam](https://github.com/Suffoquer-fang/GraphCut/blob/main/figs/old-seam.jpg)
 
 ### Surrounded Region
 before patching vs after patching
-![](https://suffoquer-fang/GraphCut/figs/surrounded.jpg)
+![surrounded](https://github.com/Suffoquer-fang/GraphCut/blob/main/figs/surrounded.jpg)
 
 ### FFT Acceleration
 
@@ -62,4 +62,3 @@ before patching vs after patching
 | :------ | :------ | :------ |
 | Entire Matching | 188.7 | 6.1 |
 | Subpatch Matching | 62.3 | 4.2 |
-| |
